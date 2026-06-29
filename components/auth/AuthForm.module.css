@@ -1,0 +1,125 @@
+.wrap {
+  margin-top: 24px;
+  text-align: left;
+}
+
+.banner {
+  margin-bottom: 16px;
+  padding: 10px 14px;
+  background: rgba(226, 85, 79, 0.15);
+  border: 1px solid var(--red, #e2554f);
+  border-radius: 8px;
+  color: #f3a39e;
+  font-size: 13px;
+  text-align: center;
+}
+
+.providers {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.provider {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: 11px 20px;
+  font-weight: 500;
+  color: var(--txt, #ece8f5);
+  background: var(--panel2, #3a3157);
+  border: 1px solid var(--line, #473c66);
+  border-radius: 999px;
+  text-decoration: none;
+  transition: transform 0.1s, filter 0.15s;
+}
+
+.provider:hover {
+  transform: translateY(-1px);
+  filter: brightness(1.1);
+}
+
+.divider {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 20px 0;
+  color: var(--muted, #a99fc4);
+  font-size: 13px;
+}
+
+.divider::before,
+.divider::after {
+  content: "";
+  flex: 1;
+  height: 1px;
+  background: var(--line, #473c66);
+}
+
+.form {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.label {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--muted, #a99fc4);
+}
+
+.input {
+  padding: 10px;
+  font-size: 15px;
+  font-family: inherit;
+  color: var(--txt, #ece8f5);
+  background: var(--bg, #16121f);
+  border: 1px solid var(--line, #473c66);
+  border-radius: 8px;
+}
+
+.input:focus {
+  outline: none;
+  border-color: var(--gold);
+}
+
+.hint {
+  font-weight: 500;
+  font-size: 11px;
+  color: var(--muted, #a99fc4);
+}
+
+.error {
+  color: #f3a39e;
+  font-size: 13px;
+}
+
+.notice {
+  color: #9fe6bd;
+  font-size: 13px;
+}
+
+.switches {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  margin-top: 16px;
+}
+
+.link {
+  border: none;
+  background: transparent;
+  color: var(--gold);
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  padding: 0;
+  box-shadow: none;
+}
+.link:hover {
+  color: var(--ember);
+}
