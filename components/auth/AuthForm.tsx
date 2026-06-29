@@ -36,6 +36,9 @@ export function AuthForm() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
+  const providerAction = mode === "register" ? "Sign up" : "Continue";
+  const emailDivider =
+    mode === "register" ? "or create with email" : mode === "forgot" ? "reset with email" : "or";
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
@@ -112,16 +115,16 @@ export function AuthForm() {
       <div className={styles.providers}>
         <a className={styles.provider} href="/api/auth/google">
           <GoogleIcon size={20} />
-          Continue with Google
+          {providerAction} with Google
         </a>
         <a className={styles.provider} href="/api/auth/telegram">
           <TelegramIcon size={20} />
-          Continue with Telegram
+          {providerAction} with Telegram
         </a>
       </div>
 
       <div className={styles.divider}>
-        <span>or</span>
+        <span>{emailDivider}</span>
       </div>
 
       <form className={styles.form} onSubmit={submit}>

@@ -8,9 +8,12 @@ import { baseUrl } from "@/lib/base-url";
 
 export async function GET(req: NextRequest) {
   const base = baseUrl(req);
+  const clientId = process.env.GOOGLE_CLIENT_ID;
+  const clientSecret = process.env.GOOGLE_CLIENT_SECRET;
   if (!process.env.SESSION_SECRET || !process.env.SUPABASE_SERVICE_KEY) {
     return NextResponse.redirect(`${base}/?auth_error=server_config`);
   }
+  if (!clientId || !clientSecret) return NextResponse.redirect(`${base}/?auth_error=google_config`);
   const { searchParams } = new URL(req.url);
   const code = searchParams.get("code");
   const state = searchParams.get("state");
@@ -37,20 +40,35 @@ export async function GET(req: NextRequest) {
     headers: { "Content-Type": "application/x-www-form-urlencoded" },
     body: new URLSearchParams({
       code,
-      client_id: process.env.GOOGLE_CLIENT_ID!,
-      client_secret: process.env.GOOGLE_CLIENT_SECRET!,
+      client_id: clientId,
+      client_secret: clientSecret,
       redirect_uri: redirectUri,
       grant_type: "authorization_code",
     }),
   });
-  if (!tokenRes.ok) return NextResponse.redirect(`${base}/?auth_error=google_token`);
+  if (!tokenRes.ok) {
+    console.error("Google token exchange failed:", await tokenRes.text().catch(() => tokenRes.statusText));
+    return NextResponse.redirect(`${base}/?auth_error=google_token`, {
+      headers: { "Set-Cookie": clearFlow },
+    });
+  }
   const tokenData = (await tokenRes.json()) as { access_token: string };
 
   const profileRes = await fetch("https://www.googleapis.com/oauth2/v2/userinfo", {
     headers: { Authorization: `Bearer ${tokenData.access_token}` },
   });
-  if (!profileRes.ok) return NextResponse.redirect(`${base}/?auth_error=google_profile`);
-  const profile = (await profileRes.json()) as { id: string; email: string; name?: string };
+  if (!profileRes.ok) {
+    console.error("Google profile fetch failed:", await profileRes.text().catch(() => profileRes.statusText));
+    return NextResponse.redirect(`${base}/?auth_error=google_profile`, {
+      headers: { "Set-Cookie": clearFlow },
+    });
+  }
+  const profile = (await profileRes.json()) as { id: string; email?: string; name?: string };
+  if (!profile.id || !profile.email) {
+    return NextResponse.redirect(`${base}/?auth_error=google_profile`, {
+      headers: { "Set-Cookie": clearFlow },
+    });
+  }
 
   const now = new Date().toISOString();
 
@@ -60,7 +78,7 @@ export async function GET(req: NextRequest) {
     if (owner && owner.id !== flow.link) {
       return NextResponse.redirect(`${base}/settings?link_error=google_taken`, { headers: { "Set-Cookie": clearFlow } });
     }
-    await db.from("users").update({ google_id: profile.id }).eq("id", flow.link);
+    await db.from("users").update({ google_id: profile.id, provider: "google", last_login: now }).eq("id", flow.link);
     return NextResponse.redirect(`${base}/settings?linked=google`, { headers: { "Set-Cookie": clearFlow } });
   }
 
@@ -112,15 +130,15 @@ export async function GET(req: NextRequest) {
       });
       if (insErr) {
         console.error("Google user insert failed:", insErr);
-        return NextResponse.redirect(`${base}/?auth_error=db`);
+        return NextResponse.redirect(`${base}/?auth_error=db`, { headers: { "Set-Cookie": clearFlow } });
       }
       await bootstrapPlayer(db, uid);
       user = { id: uid, email, role: "user" };
     }
   }
 
-  return new NextResponse(null, {
-    status: 302,
-    headers: { Location: `${base}/play`, "Set-Cookie": makeSessionCookie(user) },
-  });
+  const res = NextResponse.redirect(`${base}/play`);
+  res.headers.append("Set-Cookie", makeSessionCookie(user));
+  res.headers.append("Set-Cookie", clearFlow);
+  return res;
 }

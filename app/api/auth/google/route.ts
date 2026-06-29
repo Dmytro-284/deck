@@ -9,7 +9,8 @@ export async function GET(req: NextRequest) {
   const base = baseUrl(req);
   if (!process.env.SESSION_SECRET) return NextResponse.redirect(`${base}/?auth_error=server_config`);
   const clientId = process.env.GOOGLE_CLIENT_ID;
-  if (!clientId) return NextResponse.redirect(`${base}/?auth_error=google_config`);
+  const clientSecret = process.env.GOOGLE_CLIENT_SECRET;
+  if (!clientId || !clientSecret) return NextResponse.redirect(`${base}/?auth_error=google_config`);
 
   const redirectUri = `${base}/api/auth/google/callback`;
 

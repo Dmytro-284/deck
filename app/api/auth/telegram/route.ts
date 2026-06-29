@@ -14,7 +14,8 @@ export async function GET(req: NextRequest) {
   const base = baseUrl(req);
   if (!process.env.SESSION_SECRET) return NextResponse.redirect(`${base}/?auth_error=server_config`);
   const clientId = process.env.TELEGRAM_CLIENT_ID;
-  if (!clientId) return NextResponse.redirect(`${base}/?auth_error=telegram_config`);
+  const clientSecret = process.env.TELEGRAM_CLIENT_SECRET;
+  if (!clientId || !clientSecret) return NextResponse.redirect(`${base}/?auth_error=telegram_config`);
 
   const redirectUri = `${base}/api/auth/telegram/callback`;
   const codeVerifier = b64url(randomBytes(32));

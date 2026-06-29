@@ -69,6 +69,7 @@ async function verifyIdToken(idToken: string, clientId: string): Promise<Record<
 
 export async function GET(req: NextRequest) {
   const base = baseUrl(req);
+  const clearFlow = "tg_oidc=; Path=/; HttpOnly; SameSite=Lax; Max-Age=0";
   if (!process.env.SESSION_SECRET || !process.env.SUPABASE_SERVICE_KEY) {
     return NextResponse.redirect(`${base}/?auth_error=server_config`);
   }
@@ -85,7 +86,7 @@ export async function GET(req: NextRequest) {
   const cookies = parseCookies(req.headers.get("cookie") || "");
   const flow = cookies["tg_oidc"] ? (verify(cookies["tg_oidc"]) as { v?: string; s?: string; link?: string } | null) : null;
   if (!flow || flow.s !== state || !flow.v) {
-    return NextResponse.redirect(`${base}/?auth_error=telegram_state`);
+    return NextResponse.redirect(`${base}/?auth_error=telegram_state`, { headers: { "Set-Cookie": clearFlow } });
   }
 
   const redirectUri = `${base}/api/auth/telegram/callback`;
@@ -101,19 +102,21 @@ export async function GET(req: NextRequest) {
       code_verifier: flow.v,
     }),
   });
-  if (!tokenRes.ok) return NextResponse.redirect(`${base}/?auth_error=telegram_token`);
+  if (!tokenRes.ok) {
+    console.error("Telegram token exchange failed:", await tokenRes.text().catch(() => tokenRes.statusText));
+    return NextResponse.redirect(`${base}/?auth_error=telegram_token`, { headers: { "Set-Cookie": clearFlow } });
+  }
   const tokenData = (await tokenRes.json()) as { id_token?: string };
-  if (!tokenData.id_token) return NextResponse.redirect(`${base}/?auth_error=telegram_token`);
+  if (!tokenData.id_token) return NextResponse.redirect(`${base}/?auth_error=telegram_token`, { headers: { "Set-Cookie": clearFlow } });
 
   const claims = await verifyIdToken(tokenData.id_token, clientId);
-  if (!claims) return NextResponse.redirect(`${base}/?auth_error=telegram_idtoken`);
+  if (!claims) return NextResponse.redirect(`${base}/?auth_error=telegram_idtoken`, { headers: { "Set-Cookie": clearFlow } });
 
   const tgId = String(claims.sub ?? claims.id ?? "");
-  if (!tgId) return NextResponse.redirect(`${base}/?auth_error=telegram_idtoken`);
+  if (!tgId) return NextResponse.redirect(`${base}/?auth_error=telegram_idtoken`, { headers: { "Set-Cookie": clearFlow } });
 
   const db = serviceClient();
   const now = new Date().toISOString();
-  const clearFlow = "tg_oidc=; Path=/; HttpOnly; SameSite=Lax; Max-Age=0";
 
   // Link mode.
   if (flow.link) {
@@ -121,7 +124,7 @@ export async function GET(req: NextRequest) {
     if (owner && owner.id !== flow.link) {
       return NextResponse.redirect(`${base}/settings?link_error=telegram_taken`, { headers: { "Set-Cookie": clearFlow } });
     }
-    await db.from("users").update({ telegram_id: tgId }).eq("id", flow.link);
+    await db.from("users").update({ telegram_id: tgId, provider: "telegram", last_login: now }).eq("id", flow.link);
     return NextResponse.redirect(`${base}/settings?linked=telegram`, { headers: { "Set-Cookie": clearFlow } });
   }
 
@@ -143,10 +146,13 @@ export async function GET(req: NextRequest) {
       .eq("id", byTg.id);
     user = byTg;
   } else {
-    const name = (typeof claims.name === "string" ? claims.name : `Naufrago ${tgId.slice(-4)}`).slice(
-      0,
-      DISPLAY_NAME_MAX,
-    );
+    const rawName =
+      typeof claims.name === "string"
+        ? claims.name
+        : typeof claims.username === "string"
+          ? claims.username
+          : `Telegram ${tgId.slice(-4)}`;
+    const name = rawName.slice(0, DISPLAY_NAME_MAX);
     const uid = newId();
     const { error: insErr } = await db.from("users").insert({
       id: uid,
@@ -167,12 +173,8 @@ export async function GET(req: NextRequest) {
     user = { id: uid, email, role: "user" };
   }
 
-  return new NextResponse(null, {
-    status: 302,
-    headers: [
-      ["Location", `${base}/play`],
-      ["Set-Cookie", makeSessionCookie(user)],
-      ["Set-Cookie", clearFlow],
-    ] as unknown as HeadersInit,
-  });
+  const res = NextResponse.redirect(`${base}/play`);
+  res.headers.append("Set-Cookie", makeSessionCookie(user));
+  res.headers.append("Set-Cookie", clearFlow);
+  return res;
 }
